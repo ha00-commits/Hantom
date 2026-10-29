@@ -85,7 +85,7 @@ app.post("/admin/action", (req, res) => {
   const u = tokens[token];
   if (!u || db.users[u].role !== "owner") return res.json({ ok: false });
   const t = db.users[target];
-  if (!t) return res.json({ ok: false, err: "لا يوجد" });
+  if (!t) return res.json({ ok: false });
   if (action === "ban") t.banned = true;
   if (action === "unban") t.banned = false;
   if (action === "mute") t.muted = true;
@@ -159,14 +159,15 @@ wss.on("connection", ws => {
     }
     if (m.type === "burn") {
       const idx = db.messages.findIndex(x => x.id === m.id);
-      if (idx >= 0) {
-        const msg = db.messages[idx];
-        db.messages.splice(idx, 1);
-        save();
-        broadcast(msg.room, { type: "deleted", id: m.id });
-      }
+      if (idx >= 0) { const msg = db.messages[idx]; db.messages.splice(idx, 1); save(); broadcast(msg.room, { type: "deleted", id: m.id }); }
       return;
     }
+    if (m.type === "voice_join") { broadcast(ws.room, { type: "voice_peer", from: ws.user }); return; }
+    if (m.type === "voice_signal") {
+      wss.clients.forEach(c => { if (c.user === m.to && c.readyState === WebSocket.OPEN) send(c, { type: "voice_signal", from: ws.user, data: m.data }); });
+      return;
+    }
+    if (m.type === "voice_leave") { broadcast(ws.room, { type: "voice_left", from: ws.user }); return; }
     if (m.type === "del") {
       const idx = db.messages.findIndex(x => x.id === m.id);
       if (idx < 0) return;
