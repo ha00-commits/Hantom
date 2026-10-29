@@ -6,40 +6,42 @@
 <title>Hantom</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family:'Cairo',sans-serif; background:#0b0f14; color:#fff; height:100vh; overflow:hidden; }
-  .hidden { display:none !important; }
-  #auth { height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
-  .card { width:100%; max-width:400px; background:#121820; border:1px solid #1f2a36; border-radius:18px; padding:22px; }
-  h1 { font-size:28px; font-weight:900; }
-  .sub { color:#7d8a99; font-size:13px; margin-bottom:16px; }
-  input { width:100%; padding:12px 14px; margin-bottom:10px; border-radius:12px; border:1px solid #24303d; background:#0e141b; color:#fff; font-family:'Cairo',sans-serif; font-size:15px; outline:none; }
-  input:focus { border-color:#2f80ed; }
-  button { padding:12px; border:none; border-radius:12px; background:#2f80ed; color:#fff; font-family:'Cairo',sans-serif; font-weight:700; font-size:14px; cursor:pointer; }
-  button.ghost { background:#1a2330; }
-  .w100 { width:100%; }
-  #app { display:flex; height:100vh; }
-  #side { width:230px; background:#0e141b; border-left:1px solid #1f2a36; display:flex; flex-direction:column; }
-  #side h2 { font-size:16px; padding:14px; font-weight:900; }
-  #rooms { flex:1; overflow-y:auto; }
-  .room { padding:10px 14px; cursor:pointer; font-size:14px; border-bottom:1px solid #161f29; }
-  .room:hover, .room.active { background:#182230; }
-  #sideBtns { padding:10px; display:flex; flex-direction:column; gap:6px; }
-  #main { flex:1; display:flex; flex-direction:column; }
-  .topbar { display:flex; justify-content:space-between; align-items:center; padding:12px 16px; background:#121820; border-bottom:1px solid #1f2a36; }
-  .tag { color:#2f80ed; font-weight:700; font-size:12px; }
-  #msgs { flex:1; overflow-y:auto; padding:14px; }
-  .msg { margin-bottom:10px; }
-  .who { font-size:11px; color:#6d7b8a; }
-  .body { display:inline-block; background:#182230; padding:9px 12px; border-radius:12px; max-width:85%; font-size:15px; margin-top:2px; }
-  .msg.me { text-align:left; }
-  .msg.me .body { background:#2f80ed; }
-  .reply { font-size:11px; color:#9fb3c8; border-right:2px solid #2f80ed; padding-right:6px; margin-bottom:3px; }
-  .acts { font-size:11px; color:#6d7b8a; margin-top:3px; }
-  .acts span { cursor:pointer; margin-inline-end:10px; }
-  .acts span:hover { color:#2f80ed; }
-  .bottom { display:flex; gap:8px; padding:10px; background:#121820; border-top:1px solid #1f2a36; }
-  .bottom input { margin:0; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Cairo',sans-serif;background:#0b0f14;color:#fff;height:100vh;overflow:hidden}
+  .hidden{display:none!important}
+  #auth{height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+  .card{width:100%;max-width:400px;background:#121820;border:1px solid #1f2a36;border-radius:18px;padding:22px}
+  h1{font-size:28px;font-weight:900}
+  .sub{color:#7d8a99;font-size:13px;margin-bottom:16px}
+  input{width:100%;padding:12px 14px;margin-bottom:10px;border-radius:12px;border:1px solid #24303d;background:#0e141b;color:#fff;font-family:'Cairo',sans-serif;font-size:15px;outline:none}
+  input:focus{border-color:#2f80ed}
+  button{padding:12px;border:none;border-radius:12px;background:#2f80ed;color:#fff;font-family:'Cairo',sans-serif;font-weight:700;font-size:14px;cursor:pointer}
+  button.ghost{background:#1a2330}
+  .w100{width:100%}
+  #app{display:flex;height:100vh}
+  #side{width:220px;background:#0e141b;border-left:1px solid #1f2a36;display:flex;flex-direction:column}
+  #side h2{font-size:16px;padding:14px;font-weight:900}
+  #rooms{flex:1;overflow-y:auto}
+  .room{padding:10px 14px;cursor:pointer;font-size:14px;border-bottom:1px solid #161f29}
+  .room:hover,.room.active{background:#182230}
+  #sideBtns{padding:10px;display:flex;flex-direction:column;gap:6px}
+  #main{flex:1;display:flex;flex-direction:column;min-width:0}
+  .topbar{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:#121820;border-bottom:1px solid #1f2a36}
+  .tag{color:#2f80ed;font-weight:700;font-size:12px}
+  #msgs{flex:1;overflow-y:auto;padding:14px}
+  .msg{margin-bottom:10px}
+  .who{font-size:11px;color:#6d7b8a}
+  .body{display:inline-block;background:#182230;padding:9px 12px;border-radius:12px;max-width:85%;font-size:15px;margin-top:2px;word-break:break-word}
+  .msg.me{text-align:left}
+  .msg.me .body{background:#2f80ed}
+  .reply{font-size:11px;color:#9fb3c8;border-right:2px solid #2f80ed;padding-right:6px;margin-bottom:3px}
+  .acts{font-size:11px;color:#6d7b8a;margin-top:3px}
+  .acts span{cursor:pointer;margin-inline-end:10px}
+  .acts span:hover{color:#2f80ed}
+  .bottom{display:flex;gap:6px;padding:10px;background:#121820;border-top:1px solid #1f2a36;align-items:center}
+  .bottom input{margin:0}
+  img.att{max-width:220px;border-radius:10px;display:block;margin-top:5px}
+  a.att{color:#2f80ed;display:block;margin-top:5px;font-size:13px}
 </style>
 </head>
 <body>
@@ -64,7 +66,7 @@
       <button class="ghost" onclick="newGroup()">+ مجموعة</button>
       <button class="ghost" onclick="newPrivate()">+ غرفة بكلمة سر</button>
       <button class="ghost" onclick="newDm()">@ محادثة خاصة</button>
-      <button class="ghost" onclick="joinRoom()">🔑 انضمام لغرفة</button>
+      <button class="ghost" onclick="joinRoom()">🔑 انضمام</button>
     </div>
   </div>
   <div id="main">
@@ -75,7 +77,9 @@
     <div id="msgs"></div>
     <div class="bottom">
       <button class="ghost" onclick="report()">⚠️</button>
-      <input id="t" placeholder="اكتب رسالة...">
+      <button class="ghost" onclick="document.getElementById('f').click()">📎</button>
+      <input id="f" type="file" style="display:none" onchange="uploadFile(this)">
+      <input id="t" placeholder="اكتب رسالة..." style="flex:1">
       <button onclick="send()">إرسال</button>
     </div>
   </div>
@@ -88,102 +92,101 @@ let ws = null;
 let room = "general";
 let replyTo = null;
 
-async function api(p, b) {
-  const r = await fetch(p, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(b) });
+async function api(p, b){
+  const r = await fetch(p,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b)});
   return r.json();
 }
-function err(t){ document.getElementById("err").textContent = t || ""; }
+function err(t){ document.getElementById("err").textContent = t||""; }
 
 async function register(){
-  const res = await api("/register", { username: u.value.trim(), password: p.value });
+  const res = await api("/register",{username:u.value.trim(),password:p.value});
   if(!res.ok) return err(res.err);
   login();
 }
 async function login(){
-  const res = await api("/login", { username: u.value.trim(), password: p.value });
+  const res = await api("/login",{username:u.value.trim(),password:p.value});
   if(!res.ok) return err(res.err);
-  token = res.token; localStorage.setItem("hantom_token", token); start();
+  token = res.token; localStorage.setItem("hantom_token",token); start();
 }
 
 function start(){
   document.getElementById("auth").classList.add("hidden");
   document.getElementById("app").classList.remove("hidden");
-  const proto = location.protocol === "https:" ? "wss" : "ws";
-  ws = new WebSocket(proto + "://" + location.host);
-  ws.onopen = () => {
-    ws.send(JSON.stringify({ type:"auth", token }));
-    ws.send(JSON.stringify({ type:"join", room:"general" }));
+  if("Notification" in window) Notification.requestPermission();
+  const proto = location.protocol==="https:"?"wss":"ws";
+  ws = new WebSocket(proto+"://"+location.host);
+  ws.onopen = ()=>{
+    ws.send(JSON.stringify({type:"auth",token}));
+    ws.send(JSON.stringify({type:"join",room:"general"}));
   };
-  ws.onmessage = e => {
+  ws.onmessage = e=>{
     const m = JSON.parse(e.data);
-    if(m.type==="auth_ok"){ me = m.username; document.getElementById("me").textContent = "@"+me; refreshRooms(); }
+    if(m.type==="auth_ok"){ me=m.username; document.getElementById("me").textContent="@"+me; refreshRooms(); }
     if(m.type==="history"){ msgs.innerHTML=""; m.messages.forEach(addMsg); if(m.room) setTitle(m.room); }
-    if(m.type==="msg") addMsg(m.message);
+    if(m.type==="msg"){
+      addMsg(m.message);
+      if(m.message.from!==me && document.hidden && Notification.permission==="granted"){
+        new Notification("@"+m.message.from,{body:m.message.text||"[ملف]"});
+      }
+    }
     if(m.type==="deleted"){ const el=document.getElementById("m_"+m.id); if(el) el.remove(); }
     if(m.type==="created"){ alert("تم إنشاء: "+m.room); refreshRooms(); join(m.room); }
     if(m.type==="need_pass"){ const pw=prompt("كلمة سر الغرفة:"); if(pw) ws.send(JSON.stringify({type:"join",room:m.room,password:pw})); }
     if(m.type==="error") alert(m.msg);
   };
 }
-function setTitle(r){ room=r; document.getElementById("title").textContent = r; }
-
-function join(r){
-  replyTo = null;
-  ws.send(JSON.stringify({ type:"join", room:r }));
-  setTitle(r);
-}
+function setTitle(r){ room=r; document.getElementById("title").textContent=r; }
+function join(r){ replyTo=null; ws.send(JSON.stringify({type:"join",room:r})); setTitle(r); }
 
 function addMsg(m){
-  const div = document.createElement("div");
-  div.id = "m_"+m.id;
-  div.className = "msg" + (m.from===me ? " me":"");
-  let html = '<div class="who">@'+m.from+'</div>';
-  if(m.replyTo) html += '<div class="reply">↩ رد</div>';
-  html += '<div class="body"></div>';
-  html += '<div class="acts"><span onclick="setReply(\''+m.id+'\')">رد</span><span onclick="del(\''+m.id+'\')">حذف</span></div>';
-  div.innerHTML = html;
-  div.querySelector(".body").textContent = m.text;
+  const div=document.createElement("div");
+  div.id="m_"+m.id;
+  div.className="msg"+(m.from===me?" me":"");
+  let html='<div class="who">@'+m.from+'</div>';
+  if(m.replyTo) html+='<div class="reply">↩ رد</div>';
+  html+='<div class="body"></div>';
+  html+='<div class="acts"><span onclick="setReply(\''+m.id+'\')">رد</span><span onclick="del(\''+m.id+'\')">حذف</span></div>';
+  div.innerHTML=html;
+  div.querySelector(".body").textContent=m.text||"";
+  if(m.img){ const im=document.createElement("img"); im.className="att"; im.src=m.img; div.appendChild(im); }
+  if(m.file){ const a=document.createElement("a"); a.className="att"; a.href=m.file; a.textContent="⬇ "+(m.fname||"ملف"); div.appendChild(a); }
   msgs.appendChild(div);
-  msgs.scrollTop = msgs.scrollHeight;
+  msgs.scrollTop=msgs.scrollHeight;
 }
-function setReply(id){ replyTo = id; document.getElementById("t").placeholder = "رد على رسالة..."; }
-function del(id){ ws.send(JSON.stringify({ type:"del", id })); }
+function setReply(id){ replyTo=id; document.getElementById("t").placeholder="رد على رسالة..."; }
+function del(id){ ws.send(JSON.stringify({type:"del",id})); }
 function send(){
-  const t = document.getElementById("t").value.trim();
+  const t=document.getElementById("t").value.trim();
   if(!t) return;
-  ws.send(JSON.stringify({ type:"msg", text:t, replyTo }));
+  ws.send(JSON.stringify({type:"msg",text:t,replyTo}));
   document.getElementById("t").value=""; replyTo=null;
-  document.getElementById("t").placeholder = "اكتب رسالة...";
+  document.getElementById("t").placeholder="اكتب رسالة...";
 }
 
-function newGroup(){
-  const n = prompt("اسم المجموعة:"); if(!n) return;
-  ws.send(JSON.stringify({ type:"create", name:n, roomType:"group" }));
+async function uploadFile(inp){
+  const file=inp.files[0]; if(!file) return;
+  const fd=new FormData(); fd.append("token",token); fd.append("file",file);
+  const r=await fetch("/upload",{method:"POST",body:fd});
+  const res=await r.json();
+  if(!res.ok) return alert("فشل الرفع");
+  const isImg=file.type.startsWith("image/");
+  ws.send(JSON.stringify({type:"msg",text:isImg?"":"",img:isImg?res.url:null,file:isImg?null:res.url,fname:file.name}));
+  inp.value="";
 }
-function newPrivate(){
-  const n = prompt("اسم الغرفة:"); if(!n) return;
-  const pw = prompt("كلمة سر الغرفة:"); if(!pw) return;
-  ws.send(JSON.stringify({ type:"create", name:n, roomType:"private", password:pw }));
-}
-function newDm(){
-  const to = prompt("اسم الشخص (@):"); if(!to) return;
-  ws.send(JSON.stringify({ type:"dm", to: to.replace("@","") }));
-}
-function joinRoom(){
-  const r = prompt("اسم الغرفة:"); if(!r) return;
-  join(r);
-}
+
+function newGroup(){ const n=prompt("اسم المجموعة:"); if(n) ws.send(JSON.stringify({type:"create",name:n,roomType:"group"})); }
+function newPrivate(){ const n=prompt("اسم الغرفة:"); if(!n) return; const pw=prompt("كلمة السر:"); if(pw) ws.send(JSON.stringify({type:"create",name:n,roomType:"private",password:pw})); }
+function newDm(){ const to=prompt("اسم الشخص (@):"); if(to) ws.send(JSON.stringify({type:"dm",to:to.replace("@","")})); }
+function joinRoom(){ const r=prompt("اسم الغرفة:"); if(r) join(r); }
 async function report(){
-  const target = prompt("الشخص اللي تبلغ عنه (@):"); if(!target) return;
-  const reason = prompt("السبب:") || "";
-  const res = await api("/report", { token, target: target.replace("@",""), reason });
-  alert(res.ok ? "تم إرسال البلاغ ✅" : "فشل");
+  const target=prompt("الشخص (@):"); if(!target) return;
+  const reason=prompt("السبب:")||"";
+  const res=await api("/report",{token,target:target.replace("@",""),reason});
+  alert(res.ok?"تم إرسال البلاغ ✅":"فشل");
 }
 function refreshRooms(){
-  const list = ["general"];
-  rooms.innerHTML = list.map(r => '<div class="room" onclick="join(\''+r+'\')"># '+r+'</div>').join("");
+  rooms.innerHTML='<div class="room" onclick="join(\'general\')"># general</div>';
 }
-
 if(token) start();
 </script>
 </body>
