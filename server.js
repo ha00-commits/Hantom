@@ -5,6 +5,7 @@ const bcrypt = require("bcryptjs");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const multer = require("multer");
 
 const DB_PATH = path.join(__dirname, "data.json");
 let db = { users: {}, rooms: {}, messages: [], reports: [] };
@@ -16,8 +17,21 @@ if (!db.reports) db.reports = [];
 if (!db.rooms.general) db.rooms.general = { type: "public", owner: null, members: [] };
 function save() { fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2)); }
 
+const UPLOAD_DIR = path.join(__dirname, "uploads");
+if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR);
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, UPLOAD_DIR),
+    filename: (req, file, cb) => cb(null, Date.now() + "_" + file.originalname.replace(/[^\w.\-]/g, ""))
+  }),
+  limits: { fileSize: 10 * 1024 * 1024 }
+});
+
 const app = express();
 app.use(express.json());
+app.use("/uploads", express.static(UPLOAD_DIR));
+
+const tokens = {};
 
 const HTML = [
 '<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8">',
@@ -34,6 +48,7 @@ const HTML = [
 'input{width:100%;padding:12px 14px;margin-bottom:10px;border-radius:12px;border:1px solid #24303d;background:#0e141b;color:#fff;font-family:Cairo,sans-serif;font-size:15px;outline:none}',
 'button{padding:12px;border:none;border-radius:12px;background:#2f80ed;color:#fff;font-family:Cairo,sans-serif;font-weight:700;font-size:14px;cursor:pointer}',
 'button.ghost{background:#1a2330}',
+'button.on{background:#2e7d32}',
 '.w100{width:100%}',
 '#app{display:flex;height:100vh}',
 '#side{width:200px;background:#0e141b;border-left:1px solid #1f2a36;display:flex;flex-direction:column}',
@@ -56,6 +71,7 @@ const HTML = [
 '.bottom input{margin:0}',
 '.burn{font-size:10px;color:#ff7043;margin-top:3px}',
 '#typing{font-size:11px;color:#6d7b8a;padding:0 14px 6px}',
+'img.att{max-width:220px;border-radius:10px;display:block;margin-top:5px}',
 '</style></head><body>',
 '<div id="auth"><div class="card"><h1>Hantom</h1><div class="sub">تواصل آمن بأسماء مستخدمين</div>',
 '<input id="u" placeholder="@username"><input id="p" type="password" placeholder="كلمة السر">',
@@ -70,27 +86,36 @@ const HTML = [
 '<div id="main"><div class="topbar"><b id="title">general</b><span class="tag" id="me"></span>',
 '<button class="ghost" id="ownerBtn" style="display:none" onclick="openAdmin()">👑</button></div>',
 '<div id="msgs"></div><div id="typing"></div>',
-'<div class="bottom"><button class="ghost" onclick="report()">⚠️</button>',
+'<div class="bottom"><button class="ghost" id="micBtn" onclick="toggleVoice()">🎙️</button>',
+'<button class="ghost" onclick="report()">⚠️</button>',
+'<button class="ghost" onclick="document.getElementById(\'f\').click()">📎</button>',
 '<button class="ghost" onclick="emoji()">😀</button>',
 '<button class="ghost" id="burnBtn" onclick="toggleBurn()">🔥</button>',
+'<input id="f" type="file" style="display:none" onchange="uploadFile(this)">',
 '<input id="t" placeholder="اكتب رسالة..." style="flex:1"><button onclick="send()">إرسال</button></div></div></div>',
 '<script>',
 'let token=localStorage.getItem("hantom_token"),me="",myRole="member",ws=null,room="general",replyTo=null,burnMode=false;',
+'let voiceOn=false,peers={},localStream=null;',
+'const rtcConf={iceServers:[{urls:"stun:stun.l.google.com:19302"}]};',
 'async function api(p,b){const r=await fetch(p,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b)});return r.json();}',
 'function err(t){document.getElementById("err").textContent=t||"";}',
 'async function register(){const res=await api("/register",{username:u.value.trim(),password:p.value});if(!res.ok)return err(res.err);login();}',
 'async function login(){const res=await api("/login",{username:u.value.trim(),password:p.value});if(!res.ok)return err(res.err);token=res.token;myRole=res.role;localStorage.setItem("hantom_token",token);start();}',
 'function start(){document.getElementById("auth").classList.add("hidden");document.getElementById("app").classList.remove("hidden");',
+'if("Notification" in window)Notification.requestPermission();',
 'const proto=location.protocol==="https:"?"wss":"ws";ws=new WebSocket(proto+"://"+location.host);',
 'ws.onopen=()=>{ws.send(JSON.stringify({type:"auth",token}));ws.send(JSON.stringify({type:"join",room:"general"}));};',
 'ws.onmessage=e=>{const m=JSON.parse(e.data);',
 'if(m.type==="auth_ok"){me=m.username;document.getElementById("me").textContent="@"+me;if(myRole==="owner")document.getElementById("ownerBtn").style.display="inline-block";}',
 'if(m.type==="history"){msgs.innerHTML="";m.messages.forEach(addMsg);if(m.room)setTitle(m.room);}',
-'if(m.type==="msg")addMsg(m.message);',
+'if(m.type==="msg"){addMsg(m.message);if(m.message.from!==me&&document.hidden&&Notification.permission==="granted"){new Notification("@"+m.message.from,{body:m.message.text||"[ملف]"});}}',
 'if(m.type==="deleted"){const el=document.getElementById("m_"+m.id);if(el)el.remove();}',
 'if(m.type==="created"){alert("تم إنشاء: "+m.room);join(m.room);}',
 'if(m.type==="need_pass"){const pw=prompt("كلمة سر الغرفة:");if(pw)ws.send(JSON.stringify({type:"join",room:m.room,password:pw}));}',
 'if(m.type==="typing"){if(m.from!==me){const el=document.getElementById("typing");el.textContent="@"+m.from+" يكتب...";clearTimeout(el._h);el._h=setTimeout(()=>el.textContent="",1500);}}',
+'if(m.type==="voice_peer"){if(voiceOn&&m.from!==me)callPeer(m.from);}',
+'if(m.type==="voice_left"){if(peers[m.from]){peers[m.from].close();delete peers[m.from];}}',
+'if(m.type==="voice_signal")handleVoiceSignal(m);',
 'if(m.type==="error")alert(m.msg);};}',
 'function setTitle(r){room=r;document.getElementById("title").textContent=r;}',
 'function join(r){replyTo=null;ws.send(JSON.stringify({type:"join",room:r}));setTitle(r);}',
@@ -98,6 +123,7 @@ const HTML = [
 'let html="<div class=\\"who\\">@"+m.from+"</div><div class=\\"body\\"></div>";',
 'html+="<div class=\\"acts\\"><span onclick=\\"setReply(\'"+m.id+"\')\\">رد</span><span onclick=\\"del(\'"+m.id+"\')\\">حذف</span></div>";',
 'div.innerHTML=html;div.querySelector(".body").textContent=m.text||"";',
+'if(m.img){const im=document.createElement("img");im.className="att";im.src=m.img;div.appendChild(im);}',
 'if(m.burn){const f=document.createElement("div");f.className="burn";f.textContent="🔥 تُحرق بعد 10 ثواني";div.appendChild(f);setTimeout(()=>{if(ws)ws.send(JSON.stringify({type:"burn",id:m.id}));},10000);}',
 'msgs.appendChild(div);msgs.scrollTop=msgs.scrollHeight;}',
 'function setReply(id){replyTo=id;document.getElementById("t").placeholder="رد على رسالة...";}',
@@ -105,6 +131,11 @@ const HTML = [
 'function toggleBurn(){burnMode=!burnMode;document.getElementById("burnBtn").textContent=burnMode?"🔥✔":"🔥";}',
 'function emoji(){const list="😀😃😄😁😆😅😂🤣😊😍😘😎🥳😭😢🤭🤍😳😏🍃🪶😡🥀🥰🥱🤢😹😸😺😾😿🙀😽😼😻💘🖤🩷🩶🩵👉🏻👈🏻🫀🔥💔🗿🍭🕊🥹😚🪽";const e=prompt("اختر إيموجي:",list);if(e){document.getElementById("t").value+=e;document.getElementById("t").focus();}}',
 'function send(){const t=document.getElementById("t").value.trim();if(!t)return;ws.send(JSON.stringify({type:"msg",text:t,replyTo,burn:burnMode}));document.getElementById("t").value="";replyTo=null;burnMode=false;document.getElementById("burnBtn").textContent="🔥";}',
+'async function uploadFile(inp){const file=inp.files[0];if(!file)return;const fd=new FormData();fd.append("token",token);fd.append("file",file);const r=await fetch("/upload",{method:"POST",body:fd});const res=await r.json();if(!res.ok)return alert("فشل الرفع");const isImg=file.type.startsWith("image/");ws.send(JSON.stringify({type:"msg",text:isImg?"":file.name,img:isImg?res.url:null,fname:file.name}));inp.value="";}',
+'async function toggleVoice(){if(!voiceOn){try{localStream=await navigator.mediaDevices.getUserMedia({audio:true});}catch(e){return alert("ما قدرت أوصل للمايك");}voiceOn=true;document.getElementById("micBtn").classList.add("on");ws.send(JSON.stringify({type:"voice_join"}));}else{voiceOn=false;document.getElementById("micBtn").classList.remove("on");ws.send(JSON.stringify({type:"voice_leave"}));if(localStream)localStream.getTracks().forEach(t=>t.stop());Object.values(peers).forEach(p=>p.close());peers={};}}',
+'function makePeer(target){const pc=new RTCPeerConnection(rtcConf);peers[target]=pc;if(localStream)localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));pc.onicecandidate=e=>{if(e.candidate)ws.send(JSON.stringify({type:"voice_signal",to:target,data:{candidate:e.candidate}}));};pc.ontrack=e=>{let a=document.getElementById("au_"+target);if(!a){a=document.createElement("audio");a.id="au_"+target;a.autoplay=true;document.body.appendChild(a);}a.srcObject=e.streams[0];};return pc;}',
+'async function callPeer(target){if(peers[target]||!localStream)return;const pc=makePeer(target);const offer=await pc.createOffer();await pc.setLocalDescription(offer);ws.send(JSON.stringify({type:"voice_signal",to:target,data:{sdp:pc.localDescription}}));}',
+'async function handleVoiceSignal(m){if(!voiceOn||!localStream)return;if(!peers[m.from])makePeer(m.from);const pc=peers[m.from];if(m.data.sdp){await pc.setRemoteDescription(new RTCSessionDescription(m.data.sdp));if(m.data.sdp.type==="offer"){const ans=await pc.createAnswer();await pc.setLocalDescription(ans);ws.send(JSON.stringify({type:"voice_signal",to:m.from,data:{sdp:pc.localDescription}}));}}if(m.data.candidate){try{await pc.addIceCandidate(new RTCIceCandidate(m.data.candidate));}catch(e){}}}',
 'function newGroup(){const n=prompt("اسم المجموعة:");if(n)ws.send(JSON.stringify({type:"create",name:n,roomType:"group"}));}',
 'function newPrivate(){const n=prompt("اسم الغرفة:");if(!n)return;const pw=prompt("كلمة السر:");if(pw)ws.send(JSON.stringify({type:"create",name:n,roomType:"private",password:pw}));}',
 'function newDm(){const to=prompt("اسم الشخص (@):");if(to)ws.send(JSON.stringify({type:"dm",to:to.replace("@","")}));}',
@@ -117,8 +148,11 @@ const HTML = [
 ].join("");
 
 app.get("/", (req, res) => res.type("html").send(HTML));
-
-const tokens = {};
+app.post("/upload", upload.single("file"), (req, res) => {
+  if (!tokens[req.body.token]) return res.json({ ok: false });
+  if (!req.file) return res.json({ ok: false });
+  res.json({ ok: true, url: "/uploads/" + req.file.filename });
+});
 app.post("/register", (req, res) => {
   const { username, password } = req.body || {};
   if (!username || !password) return res.json({ ok: false, err: "بيانات ناقصة" });
@@ -212,15 +246,19 @@ wss.on("connection", ws => {
     if (m.type === "msg") {
       if (user.muted || !ws.room) return;
       const text = String(m.text || "").slice(0, 2000).trim();
-      if (!text) return;
-      const msg = { id: crypto.randomBytes(6).toString("hex"), room: ws.room, from: ws.user, text, burn: !!m.burn, time: Date.now() };
+      if (!text && !m.img) return;
+      const msg = { id: crypto.randomBytes(6).toString("hex"), room: ws.room, from: ws.user, text, img: m.img || null, fname: m.fname || null, burn: !!m.burn, time: Date.now() };
       db.messages.push(msg);
       if (db.messages.length > 5000) db.messages = db.messages.slice(-5000);
       save();
       return broadcast(ws.room, { type: "msg", message: msg });
     }
-    if (m.type === "typing") {
-      return broadcast(ws.room, { type: "typing", from: ws.user });
+    if (m.type === "typing") return broadcast(ws.room, { type: "typing", from: ws.user });
+    if (m.type === "voice_join") return broadcast(ws.room, { type: "voice_peer", from: ws.user });
+    if (m.type === "voice_leave") return broadcast(ws.room, { type: "voice_left", from: ws.user });
+    if (m.type === "voice_signal") {
+      wss.clients.forEach(c => { if (c.user === m.to && c.readyState === 1) send(c, { type: "voice_signal", from: ws.user, data: m.data }); });
+      return;
     }
     if (m.type === "burn") {
       const i = db.messages.findIndex(x => x.id === m.id);
