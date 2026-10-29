@@ -25,11 +25,12 @@
   .room{padding:10px 14px;cursor:pointer;font-size:14px;border-bottom:1px solid #161f29}
   #sideBtns{padding:10px;display:flex;flex-direction:column;gap:6px}
   #main{flex:1;display:flex;flex-direction:column;min-width:0}
-  .topbar{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;background:#121820;border-bottom:1px solid #1f2a36;gap:6px}
+  .topbar{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;background:#121820;border-bottom:1px solid #1f2a36;gap:6px;flex-wrap:wrap}
   .tag{color:#2f80ed;font-weight:700;font-size:12px}
   #msgs{flex:1;overflow-y:auto;padding:14px}
   .msg{margin-bottom:10px}
-  .who{font-size:11px;color:#6d7b8a}
+  .who{font-size:11px;color:#6d7b8a;display:flex;align-items:center;gap:4px}
+  .av{width:16px;height:16px;border-radius:50%;object-fit:cover}
   .body{display:inline-block;background:#182230;padding:9px 12px;border-radius:12px;max-width:85%;font-size:15px;margin-top:2px;word-break:break-word}
   .msg.me{text-align:left}
   .msg.me .body{background:#2f80ed}
@@ -40,6 +41,7 @@
   .burn{font-size:10px;color:#ff7043;margin-top:3px}
   #typing{font-size:11px;color:#6d7b8a;padding:0 14px 6px}
   img.att{max-width:220px;border-radius:10px;display:block;margin-top:5px}
+  .check{font-size:11px;color:#4db6ac;margin-inline-start:4px}
 </style>
 </head>
 <body>
@@ -73,6 +75,8 @@
       <b id="title">general</b>
       <span class="tag" id="me"></span>
       <button class="ghost" onclick="setName()">👤</button>
+      <button class="ghost" onclick="document.getElementById('av').click()">🖼️</button>
+      <input id="av" type="file" accept="image/*" style="display:none" onchange="uploadAvatar(this)">
       <button class="ghost" onclick="searchMsg()">🔍</button>
       <button class="ghost" id="ownerBtn" style="display:none" onclick="openAdmin()">👑</button>
     </div>
@@ -131,6 +135,13 @@ function start(){
     if(m.type==="created"){ alert("تم إنشاء: "+m.room); join(m.room); }
     if(m.type==="need_pass"){ const pw=prompt("كلمة سر الغرفة:"); if(pw) ws.send(JSON.stringify({type:"join",room:m.room,password:pw})); }
     if(m.type==="typing"){ if(m.from!==me){ const el=document.getElementById("typing"); el.textContent=(m.fromName||m.from)+" يكتب..."; clearTimeout(el._h); el._h=setTimeout(()=>el.textContent="",1500);} }
+    if(m.type==="seen" && m.from!==me){
+      document.querySelectorAll(".msg.me .body").forEach(b=>{
+        if(!b.querySelector(".check")){
+          const s=document.createElement("span"); s.className="check"; s.textContent="✓✓"; b.appendChild(s);
+        }
+      });
+    }
     if(m.type==="voice_peer"){ if(voiceOn && m.from!==me) callPeer(m.from); }
     if(m.type==="voice_left"){ if(peers[m.from]){ peers[m.from].close(); delete peers[m.from]; } }
     if(m.type==="voice_signal") handleVoiceSignal(m);
@@ -144,7 +155,8 @@ function addMsg(m){
   const div=document.createElement("div");
   div.id="m_"+m.id;
   div.className="msg"+(m.from===me?" me":"");
-  let html='<div class="who">'+(m.fromName||m.from)+' (@'+m.from+')</div><div class="body"></div>';
+  const av = m.fromAvatar ? '<img class="av" src="'+m.fromAvatar+'">' : '';
+  let html='<div class="who">'+av+(m.fromName||m.from)+' (@'+m.from+')</div><div class="body"></div>';
   html+='<div class="acts"><span onclick="setReply(\''+m.id+'\')">رد</span><span onclick="del(\''+m.id+'\')">حذف</span></div>';
   div.innerHTML=html;
   div.querySelector(".body").textContent=m.text||"";
@@ -155,6 +167,7 @@ function addMsg(m){
   }
   msgs.appendChild(div);
   msgs.scrollTop=msgs.scrollHeight;
+  if(m.from!==me) ws.send(JSON.stringify({type:"seen",room:room}));
 }
 function setReply(id){ replyTo=id; document.getElementById("t").placeholder="رد على رسالة..."; }
 function del(id){ ws.send(JSON.stringify({type:"del",id})); }
@@ -180,6 +193,16 @@ async function uploadFile(inp){
   if(!res.ok) return alert("فشل الرفع");
   const isImg=file.type.startsWith("image/");
   ws.send(JSON.stringify({type:"msg",text:isImg?"":file.name,img:isImg?res.url:null,fname:file.name}));
+  inp.value="";
+}
+async function uploadAvatar(inp){
+  const file=inp.files[0]; if(!file) return;
+  const fd=new FormData(); fd.append("token",token); fd.append("file",file);
+  const r=await fetch("/upload",{method:"POST",body:fd});
+  const res=await r.json();
+  if(!res.ok) return alert("فشل رفع الصورة");
+  const a=await api("/setavatar",{token,url:res.url});
+  alert(a.ok?"تم تحديث صورتك ✅":"فشل");
   inp.value="";
 }
 async function setName(){
