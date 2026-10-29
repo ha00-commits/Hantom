@@ -5,6 +5,7 @@ const bcrypt = require("bcryptjs");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const multer = require("multer");
 
 const DB_PATH = path.join(__dirname, "data.json");
 let db = { users: {}, rooms: {}, messages: [], reports: [] };
@@ -21,9 +22,21 @@ function save() {
   fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));
 }
 
+const UPLOAD_DIR = path.join(__dirname, "uploads");
+if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR);
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, UPLOAD_DIR),
+    filename: (req, file, cb) =>
+      cb(null, Date.now() + "_" + file.originalname.replace(/[^\w.\-]/g, ""))
+  }),
+  limits: { fileSize: 10 * 1024 * 1024 }
+});
+
 const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
+app.use("/uploads", express.static(UPLOAD_DIR));
 
 const tokens = {};
 
@@ -60,6 +73,12 @@ app.post("/login", (req, res) => {
   res.json({ ok: true, token, role: user.role });
 });
 
+app.post("/upload", upload.single("file"), (req, res) => {
+  if (!tokens[req.body.token]) return res.json({ ok: false, err: "غير مسجل" });
+  if (!req.file) return res.json({ ok: false, err: "لا ملف" });
+  res.json({ ok: true, url: "/uploads/" + req.file.filename });
+});
+
 app.post("/report", (req, res) => {
   const { token, target, reason } = req.body || {};
   const reporter = tokens[token];
@@ -76,12 +95,6 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
 function send(ws, obj) { try { ws.send(JSON.stringify(obj)); } catch (e) {} }
-
-function canJoin(user, room) {
-  if (!room) return false;
-  if (room.type === "public") return true;
-  return (room.members || []).includes(user);
-}
 
 function broadcast(roomName, obj) {
   wss.clients.forEach(c => {
@@ -108,18 +121,13 @@ wss.on("connection", ws => {
     if (m.type === "join") {
       const room = db.rooms[m.room];
       if (!room) return send(ws, { type: "error", msg: "الغرفة غير موجودة" });
-      if (room.type === "private" && room.password) {
+      if (room.password) {
         if (!m.password || m.password !== room.password) {
           return send(ws, { type: "need_pass", room: m.room });
         }
       }
-      if (!canJoin(ws.user, room) && room.type !== "private") {
-        if (!(room.members || []).includes(ws.user)) room.members.push(ws.user);
-      }
-      if (room.type === "private" && !(room.members || []).includes(ws.user)) {
-        room.members = room.members || [];
-        room.members.push(ws.user);
-      }
+      room.members = room.members || [];
+      if (!room.members.includes(ws.user)) room.members.push(ws.user);
       save();
       ws.room = m.room;
       const hist = db.messages.filter(x => x.room === m.room).slice(-50);
@@ -160,13 +168,16 @@ wss.on("connection", ws => {
     if (m.type === "msg") {
       if (user.muted) return send(ws, { type: "error", msg: "مكتوم" });
       const text = String(m.text || "").slice(0, 2000).trim();
-      if (!text || !ws.room) return;
+      if ((!text && !m.img && !m.file) || !ws.room) return;
       const msg = {
         id: crypto.randomBytes(6).toString("hex"),
         room: ws.room,
         from: ws.user,
         text,
         replyTo: m.replyTo || null,
+        img: m.img || null,
+        file: m.file || null,
+        fname: m.fname || null,
         time: Date.now()
       };
       db.messages.push(msg);
