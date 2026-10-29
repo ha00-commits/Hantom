@@ -41,7 +41,7 @@ app.post("/register", (req, res) => {
   if (u.length < 3) return res.json({ ok: false, err: "اسم قصير" });
   if (db.users[u]) return res.json({ ok: false, err: "الاسم مستخدم" });
   const owner = Object.keys(db.users).length === 0;
-  db.users[u] = { username: u, name: u, pass: bcrypt.hashSync(password, 10), role: owner ? "owner" : "member", banned: false, muted: false, created: Date.now() };
+  db.users[u] = { username: u, name: u, avatar: null, pass: bcrypt.hashSync(password, 10), role: owner ? "owner" : "member", banned: false, muted: false, created: Date.now() };
   save();
   res.json({ ok: true });
 });
@@ -55,7 +55,7 @@ app.post("/login", (req, res) => {
   if (!bcrypt.compareSync(password || "", user.pass)) return res.json({ ok: false, err: "كلمة السر خاطئة" });
   const t = crypto.randomBytes(24).toString("hex");
   tokens[t] = u;
-  res.json({ ok: true, token: t, role: user.role, name: user.name || u });
+  res.json({ ok: true, token: t, role: user.role, name: user.name || u, avatar: user.avatar || null });
 });
 
 app.post("/setname", (req, res) => {
@@ -63,6 +63,15 @@ app.post("/setname", (req, res) => {
   const u = tokens[token];
   if (!u) return res.json({ ok: false });
   db.users[u].name = String(name || "").slice(0, 30);
+  save();
+  res.json({ ok: true });
+});
+
+app.post("/setavatar", (req, res) => {
+  const { token, url } = req.body || {};
+  const u = tokens[token];
+  if (!u) return res.json({ ok: false });
+  db.users[u].avatar = url;
   save();
   res.json({ ok: true });
 });
@@ -127,7 +136,8 @@ wss.on("connection", ws => {
       const u = tokens[m.token];
       if (!u) return send(ws, { type: "error", msg: "توكن غير صالح" });
       ws.user = u;
-      return send(ws, { type: "auth_ok", username: u, name: db.users[u].name || u });
+      const usr = db.users[u];
+      return send(ws, { type: "auth_ok", username: u, name: usr.name || u, avatar: usr.avatar || null });
     }
     if (!ws.user) return;
     const user = db.users[ws.user];
@@ -160,13 +170,14 @@ wss.on("connection", ws => {
       if (user.muted || !ws.room) return;
       const text = String(m.text || "").slice(0, 2000).trim();
       if (!text && !m.img) return;
-      const msg = { id: crypto.randomBytes(6).toString("hex"), room: ws.room, from: ws.user, fromName: user.name || ws.user, text, img: m.img || null, fname: m.fname || null, burn: !!m.burn, time: Date.now() };
+      const msg = { id: crypto.randomBytes(6).toString("hex"), room: ws.room, from: ws.user, fromName: user.name || ws.user, fromAvatar: user.avatar || null, text, img: m.img || null, fname: m.fname || null, burn: !!m.burn, time: Date.now() };
       db.messages.push(msg);
       if (db.messages.length > 5000) db.messages = db.messages.slice(-5000);
       save();
       return broadcast(ws.room, { type: "msg", message: msg });
     }
     if (m.type === "typing") return broadcast(ws.room, { type: "typing", from: ws.user, fromName: user.name || ws.user });
+    if (m.type === "seen") return broadcast(ws.room, { type: "seen", room: ws.room, from: ws.user, time: Date.now() });
     if (m.type === "voice_join") return broadcast(ws.room, { type: "voice_peer", from: ws.user });
     if (m.type === "voice_leave") return broadcast(ws.room, { type: "voice_left", from: ws.user });
     if (m.type === "voice_signal") {
