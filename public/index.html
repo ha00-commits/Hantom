@@ -17,6 +17,7 @@
   input:focus{border-color:#2f80ed}
   button{padding:12px;border:none;border-radius:12px;background:#2f80ed;color:#fff;font-family:'Cairo',sans-serif;font-weight:700;font-size:14px;cursor:pointer}
   button.ghost{background:#1a2330}
+  button.on{background:#2e7d32}
   .w100{width:100%}
   #app{display:flex;height:100vh}
   #side{width:210px;background:#0e141b;border-left:1px solid #1f2a36;display:flex;flex-direction:column}
@@ -26,7 +27,7 @@
   .room:hover{background:#182230}
   #sideBtns{padding:10px;display:flex;flex-direction:column;gap:6px}
   #main{flex:1;display:flex;flex-direction:column;min-width:0}
-  .topbar{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;background:#121820;border-bottom:1px solid #1f2a36}
+  .topbar{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;background:#121820;border-bottom:1px solid #1f2a36;gap:6px}
   .tag{color:#2f80ed;font-weight:700;font-size:12px}
   #msgs{flex:1;overflow-y:auto;padding:14px}
   .msg{margin-bottom:10px}
@@ -78,6 +79,7 @@
     </div>
     <div id="msgs"></div>
     <div class="bottom">
+      <button class="ghost" id="micBtn" onclick="toggleVoice()">🎙️</button>
       <button class="ghost" onclick="report()">⚠️</button>
       <button class="ghost" onclick="document.getElementById('f').click()">📎</button>
       <button class="ghost" id="burnBtn" onclick="toggleBurn()">🔥</button>
@@ -91,6 +93,8 @@
 <script>
 let token = localStorage.getItem("hantom_token");
 let me = "", myRole = "member", ws = null, room = "general", replyTo = null, burnMode = false;
+let voiceOn = false, peers = {}, localStream = null;
+const rtcConf = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
 
 async function api(p, b){
   const r = await fetch(p,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b)});
@@ -138,6 +142,9 @@ function start(){
     if(m.type==="deleted"){ const el=document.getElementById("m_"+m.id); if(el) el.remove(); }
     if(m.type==="created"){ alert("تم إنشاء: "+m.room); join(m.room); }
     if(m.type==="need_pass"){ const pw=prompt("كلمة سر الغرفة:"); if(pw) ws.send(JSON.stringify({type:"join",room:m.room,password:pw})); }
+    if(m.type==="voice_peer"){ if(voiceOn && m.from!==me) callPeer(m.from); }
+    if(m.type==="voice_left"){ if(peers[m.from]){ peers[m.from].close(); delete peers[m.from]; } }
+    if(m.type==="voice_signal") handleVoiceSignal(m);
     if(m.type==="error") alert(m.msg);
   };
 }
@@ -184,6 +191,61 @@ async function uploadFile(inp){
   ws.send(JSON.stringify({type:"msg",text:"",img:isImg?res.url:null,file:isImg?null:res.url,fname:file.name}));
   inp.value="";
 }
+
+async function toggleVoice(){
+  if(!voiceOn){
+    try{ localStream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+    catch(e){ return alert("ما قدرت أوصل للمايك"); }
+    voiceOn = true;
+    document.getElementById("micBtn").classList.add("on");
+    ws.send(JSON.stringify({ type: "voice_join" }));
+  }else{
+    voiceOn = false;
+    document.getElementById("micBtn").classList.remove("on");
+    ws.send(JSON.stringify({ type: "voice_leave" }));
+    if(localStream) localStream.getTracks().forEach(t=>t.stop());
+    Object.values(peers).forEach(p=>p.close());
+    peers = {};
+  }
+}
+function makePeer(target){
+  const pc = new RTCPeerConnection(rtcConf);
+  peers[target] = pc;
+  if(localStream) localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+  pc.onicecandidate = e => {
+    if(e.candidate) ws.send(JSON.stringify({ type:"voice_signal", to:target, data:{ candidate:e.candidate } }));
+  };
+  pc.ontrack = e => {
+    let audio = document.getElementById("au_"+target);
+    if(!audio){ audio = document.createElement("audio"); audio.id="au_"+target; audio.autoplay=true; document.body.appendChild(audio); }
+    audio.srcObject = e.streams[0];
+  };
+  return pc;
+}
+async function callPeer(target){
+  if(peers[target] || !localStream) return;
+  const pc = makePeer(target);
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  ws.send(JSON.stringify({ type:"voice_signal", to:target, data:{ sdp: pc.localDescription } }));
+}
+async function handleVoiceSignal(m){
+  if(!voiceOn || !localStream) return;
+  if(!peers[m.from]) makePeer(m.from);
+  const pc = peers[m.from];
+  if(m.data.sdp){
+    await pc.setRemoteDescription(new RTCSessionDescription(m.data.sdp));
+    if(m.data.sdp.type === "offer"){
+      const ans = await pc.createAnswer();
+      await pc.setLocalDescription(ans);
+      ws.send(JSON.stringify({ type:"voice_signal", to:m.from, data:{ sdp: pc.localDescription } }));
+    }
+  }
+  if(m.data.candidate){
+    try{ await pc.addIceCandidate(new RTCIceCandidate(m.data.candidate)); }catch(e){}
+  }
+}
+
 function newGroup(){ const n=prompt("اسم المجموعة:"); if(n) ws.send(JSON.stringify({type:"create",name:n,roomType:"group"})); }
 function newPrivate(){ const n=prompt("اسم الغرفة:"); if(!n) return; const pw=prompt("كلمة السر:"); if(pw) ws.send(JSON.stringify({type:"create",name:n,roomType:"private",password:pw})); }
 function newDm(){ const to=prompt("اسم الشخص (@):"); if(to) ws.send(JSON.stringify({type:"dm",to:to.replace("@","")})); }
@@ -210,4 +272,4 @@ async function openAdmin(){
 if(token) start();
 </script>
 </body>
-     </html>
+       </html>
